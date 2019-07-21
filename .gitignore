@@ -1,0 +1,11 @@
+.idea/*
+*.pyc
+media/*
+staticfiles/
+.DS_Store
+*.mo
+.coverage
+celerybeat*
+htmlcov/*
+venv/*
+.vscode/*
