@@ -1,0 +1,40 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres
+  web:
+    build:
+      context: web
+      dockerfile: Dockerfile
+    command: python amqpservice/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/code
+      - .:/amqpservice
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  redis:
+    image: sickp/alpine-redis:3.2.2
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - .:/data
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    build:
+      context: rabbitmq
+      dockerfile: Dockerfile
+    hostname: "rabbit"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    labels:
+      NAME: "rabbitmq"
+    volumes:
+      - .:/rabbitmq-isolated.conf
