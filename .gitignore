@@ -9,3 +9,4 @@ celerybeat*
 htmlcov/*
 venv/*
 .vscode/*
+Dockerfile
