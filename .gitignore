@@ -10,3 +10,4 @@ htmlcov/*
 venv/*
 .vscode/*
 Dockerfile
+dump.rdb
