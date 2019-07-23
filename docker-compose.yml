@@ -3,19 +3,38 @@ version: '3'
 services:
   db:
     image: postgres
-  web:
+
+  amqpservice:
     build:
-      context: web
+      context: amqpservice
       dockerfile: Dockerfile
     command: python amqpservice/manage.py runserver 0.0.0.0:8000
     volumes:
-      - .:/code
+      - .:/amqpservice_code
       - .:/amqpservice
     ports:
       - "8000:8000"
     depends_on:
       - db
       - redis
+      - rabbitmq
+
+  consumer_mock:
+    build:
+      context: consumer_mock
+      dockerfile: Dockerfile
+    command: python consumer_mock/consumer_mock.py
+    volumes:
+      - .:/consumer_mock_code
+      - .:/consumer_mock
+    expose:
+      - "5672"
+      - "15672"  
+    depends_on:
+      - rabbitmq
+      - redis
+    links:
+      - rabbitmq
 
   redis:
     image: sickp/alpine-redis:3.2.2
