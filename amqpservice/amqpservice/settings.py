@@ -102,6 +102,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+RABBITMQ_USER = os.getenv('RABBITMQ_USER')
+RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD')
+
+CELERY_BROKER_URL = f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@localhost:15672/'
+CELERY_RESULT_BACKEND = f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@localhost:15672/'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
