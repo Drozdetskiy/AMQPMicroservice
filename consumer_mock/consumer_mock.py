@@ -56,6 +56,7 @@ def generate_message():
     return 'test message'
 
 
+# Need to rename file from consumer to producer!
 if __name__ == '__main__':
     rabbit_credentials = RabbitCredsContainer()
 
