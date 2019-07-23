@@ -23,13 +23,17 @@ services:
     build:
       context: consumer_mock
       dockerfile: Dockerfile
-    command: python consumer_mock/consumer_mock.py
+    command: >
+          /bin/bash -c "
+          sleep 15;
+          python consumer_mock/consumer_mock.py;
+          "
     volumes:
       - .:/consumer_mock_code
       - .:/consumer_mock
     expose:
       - "5672"
-      - "15672"  
+      - "15672"
     depends_on:
       - rabbitmq
       - redis
