@@ -19,18 +19,18 @@ services:
       - redis
       - rabbitmq
 
-  consumer_mock:
+  producer_mock:
     build:
-      context: consumer_mock
+      context: producer
       dockerfile: Dockerfile
     command: >
           /bin/bash -c "
           sleep 15;
-          python consumer_mock/consumer_mock.py;
+          python producer/producer_mock.py;
           "
     volumes:
-      - .:/consumer_mock_code
-      - .:/consumer_mock
+      - .:/producer_code
+      - .:/producer
     expose:
       - "5672"
       - "15672"
