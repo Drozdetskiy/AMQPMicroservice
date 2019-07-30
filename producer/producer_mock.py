@@ -2,18 +2,18 @@ import pika
 from pika import BasicProperties
 
 import json
+import time
+import random
 from contextlib import contextmanager
-from time import sleep
 from os import getenv
-from random import randint
 
 
 class ProducerConfig:
     X_MAX_PRIORITY = 10
     MESSAGE_PRIORITY = 3
-    MESSAGE_PING_RATE = 0.02
+    MESSAGE_PING_RATE = 1
     PLAYER_MAX_ID = 3000000
-    PLAYER_MAX_RATING = 100
+    PLAYER_RATING_ORDER = 5
 
 
 class RabbitCredsContainer:
@@ -43,26 +43,28 @@ class RabbitCredsContainer:
             f'host {self.hostname}:{self.port}'
 
 
-# Need to add datetime - watch the task.
 class User:
-    def __init__(self, id=None, rating=None):
-        self.id = id if id is not None else randint(
+    def __init__(self, user_id=None, rating=None, datetime=None):
+        self.user_id = user_id if user_id is not None else random.randint(
             0, ProducerConfig.PLAYER_MAX_ID
         )
-        self.rating = rating if rating is not None else randint(
-            0, ProducerConfig.PLAYER_MAX_RATING
+        self.rating = rating if rating is not None else round(
+            random.random(),
+            ProducerConfig.PLAYER_RATING_ORDER
         )
+        self.datetime = datetime or int(time.time())
 
     def get_info(self):
         return json.dumps(
             {
-                'id': self.id,
-                'rating': self.rating
+                'user_id': self.user_id,
+                'rating': self.rating,
+                'datetime': self.datetime,
             }
         )
 
     def __repr__(self):
-        return f'User: {self.id} - {self.rating}'
+        return f'User: {self.user_id} - {self.rating} - {self.datetime}'
 
 
 @contextmanager
@@ -102,7 +104,7 @@ def run_mock():
         while True:
             message = generate_message()
             ping_message(channel, message, queue=rabbit_credentials.queue)
-            sleep(ProducerConfig.MESSAGE_PING_RATE)
+            time.sleep(ProducerConfig.MESSAGE_PING_RATE)
 
 
 if __name__ == '__main__':

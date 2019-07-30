@@ -19,6 +19,20 @@ services:
       - redis
       - rabbitmq
 
+  rating_consumer_service:
+    build:
+      context: amqpservice
+      dockerfile: Dockerfile
+    command: >
+          /bin/bash -c "
+          sleep 15;
+          python manage.py runconsumer;
+          "
+    depends_on:
+      - db
+#      - rabbitmq
+#      - producer_mock
+
   producer_mock:
     build:
       context: producer
@@ -41,7 +55,7 @@ services:
       - rabbitmq
 
   redis:
-    image: sickp/alpine-redis:3.2.2
+    image: redis
     restart: unless-stopped
     expose:
       - "6379"

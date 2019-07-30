@@ -2,3 +2,4 @@ Django==2.2.1
 djangorestframework==3.9.3
 psycopg2==2.8.2
 celery==4.3
+pika==1.1.0
