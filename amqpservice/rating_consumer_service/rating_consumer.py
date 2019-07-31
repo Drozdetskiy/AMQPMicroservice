@@ -5,7 +5,14 @@ import pika
 from django.conf import settings
 
 from contextlib import contextmanager
-from threading import Timer, Thread
+from threading import Timer, Thread, Lock
+
+
+class PeriodicTimer(Timer):
+    def run(self):
+        while not self.finished.is_set():
+            self.finished.wait(self.interval)
+            self.function(*self.args, **self.kwargs)
 
 
 class Message:
@@ -18,11 +25,13 @@ class MessageDict:
     def __init__(self):
         self.last_message_tag = None
         self._message_dict = {}
+        self.last_channel = None
 
-    def add_message(self, message_tag, message_body):
+    def add_message(self, message_tag, message_body, last_channel):
         message_body = json.loads(message_body)
         print(message_body)
         self.last_message_tag = message_tag
+        self.last_channel = last_channel
 
         key = message_body['user_id']
         new_message = Message(**message_body)
@@ -42,18 +51,6 @@ class MessageDict:
     @property
     def values(self):
         return self._message_dict.values()
-
-
-class ReusableTimer(Timer):
-    def reuse(self):
-        new_timer = ReusableTimer(
-            self.interval,
-            self.function,
-            self.args,
-            self.kwargs
-        )
-        new_timer.start()
-        return new_timer
 
 
 class DjangoRabbitCredsContainer:
@@ -93,18 +90,6 @@ def connection_manager(parameters):
         print('Connection was closed')
 
 
-def collect_with_timer(timer_sec, collect_func, args=(), kwargs=None):
-    timer = ReusableTimer(timer_sec, collect_func, args, kwargs)
-    timer.start()
-    while True:
-        if not timer.is_alive():
-            timer = timer.reuse()
-
-
-def collect():
-    print('hello')
-
-
 def run_consumer():
     rabbit_credentials = DjangoRabbitCredsContainer()
 
@@ -121,21 +106,21 @@ def run_consumer():
         print(' [*] Waiting for messages. To exit press CTRL+C')
 
         message_dict = MessageDict()
+        commit = type('Commit', (), {'status': False, })
 
         def callback(ch, method, properties, body):
-            message_dict.add_message(method.delivery_tag, body)
+            message_dict.add_message(method.delivery_tag, body, ch)
+            if commit.status:
+                ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+                commit.status = False
 
-        channel.basic_qos(prefetch_count=10)
+        channel.basic_qos(prefetch_count=0)
         channel.basic_consume(queue=settings.RABBITMQ_QUEUE_NAME,
                               on_message_callback=callback)
 
-        channel.start_consuming(),
-        timer_thread = Thread(
-            target=collect_with_timer,
-            args=(settings.RABBITMQ_COLLECT_TIME, collect)
-        )
-
-        timer_thread.start()
+        timer = PeriodicTimer(5, setattr, (commit, 'status', True), {})
+        timer.start()
+        channel.start_consuming()
 
 
 if __name__ == '__main__':
