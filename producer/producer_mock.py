@@ -11,7 +11,7 @@ from os import getenv
 class ProducerConfig:
     X_MAX_PRIORITY = 10
     MESSAGE_PRIORITY = 3
-    MESSAGE_PING_RATE = 1
+    MESSAGE_PING_RATE = 0.02
     PLAYER_MAX_ID = 3000000
     PLAYER_RATING_ORDER = 5
 

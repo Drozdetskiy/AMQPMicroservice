@@ -1,93 +1,86 @@
-import json
-
-import pika
-
+import pytz
 from django.conf import settings
 
-from contextlib import contextmanager
-from threading import Timer, Thread, Lock
+import json
+from datetime import datetime
 
-
-class PeriodicTimer(Timer):
-    def run(self):
-        while not self.finished.is_set():
-            self.finished.wait(self.interval)
-            self.function(*self.args, **self.kwargs)
-
-
-class Message:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+from rating_api.models import UserRating
+from rating_consumer_service.utils import PeriodicTimer, \
+    DjangoRabbitCredsContainer
+from rating_consumer_service.utils.connection_manager import \
+    connection_manager
 
 
 class MessageDict:
     def __init__(self):
-        self.last_message_tag = None
-        self._message_dict = {}
-        self.last_channel = None
+        self.message_dict = {}
+        self._update_list = []
+        self._new_objects_list = None
+        self._query = None
 
-    def add_message(self, message_tag, message_body, last_channel):
+    def add_message(self, message_body):
         message_body = json.loads(message_body)
-        print(message_body)
-        self.last_message_tag = message_tag
-        self.last_channel = last_channel
 
         key = message_body['user_id']
-        new_message = Message(**message_body)
-        current_message = self._message_dict.get(key)
+        new_message = UserRating(
+            user_id=message_body['user_id'],
+            rating=message_body['rating'],
+            datetime=datetime.fromtimestamp(
+                message_body['datetime'],
+                tz=pytz.UTC
+            )
+        )
+        current_message = self.message_dict.get(key)
 
         if not current_message \
                 or current_message.datetime < new_message.datetime:
-            self._message_dict[key] = new_message
+            self.message_dict[key] = new_message
 
-    def clear(self):
-        self._message_dict.clear()
+    def _create_update_list(self):
+        if self._query is None:
+            self._query = UserRating.objects.filter(
+                user_id__in=self.message_dict.keys()
+            )
+            print(self._query)
+        for rated_user in self._query:
+            bd_date = rated_user.datetime
+            updated_user_id = rated_user.user_id
+            updated_date = self.message_dict[updated_user_id].datetime
+            updated_user = self.message_dict.pop(updated_user_id)
+            if bd_date < updated_date:
+                rated_user.rating = updated_user.rating
+                rated_user.datetime = updated_user.datetime
+                self._update_list.append(rated_user)
 
-    @property
-    def keys(self):
-        return self._message_dict.keys()
+    def _create_new_objects_list(self):
+        """
+        Create a list of new objects.
 
-    @property
-    def values(self):
-        return self._message_dict.values()
+        May be called only after _create_update_list.
+        """
+        self._new_objects_list = self.message_dict.values()
+        print(self._new_objects_list)
+        print(self._update_list)
 
+    def _clear_data(self):
+        self.message_dict.clear()
+        self._update_list.clear()
+        self._new_objects_list = None
+        self._query = None
 
-class DjangoRabbitCredsContainer:
-    def __init__(self):
-        self.username = settings.RABBITMQ_USER
-        self.password = settings.RABBITMQ_PASSWORD
-        self.hostname = settings.RABBITMQ_HOST
-        self.port = settings.RABBITMQ_PORT
-        self.virtual_host = settings.RABBITMQ_VIRTUAL_HOST
-        self.queue = settings.RABBITMQ_QUEUE_NAME
-
-    @property
-    def _credentials(self):
-        return pika.PlainCredentials(self.username, self.password)
-
-    @property
-    def parameters(self):
-        return pika.ConnectionParameters(
-            host=self.hostname,
-            port=self.port,
-            virtual_host=self.virtual_host,
-            credentials=self._credentials,
-        )
-
-    def __repr__(self):
-        return f'Connector to Rabbit {self.username} on ' \
-            f'host {self.hostname}:{self.port}'
-
-
-@contextmanager
-def connection_manager(parameters):
-    connection = pika.BlockingConnection(parameters)
-    try:
-        yield connection
-    finally:
-        connection.close()
-        print('Connection was closed')
+    def save_to_db(self):
+        self._create_update_list()
+        self._create_new_objects_list()
+        if self._update_list:
+            UserRating.objects.bulk_update(
+                self._update_list,
+                ('rating', 'datetime')
+            )
+        if self._new_objects_list:
+            UserRating.objects.bulk_create(
+                self._new_objects_list
+            )
+        self._clear_data()
 
 
 def run_consumer():
@@ -109,9 +102,11 @@ def run_consumer():
         commit = type('Commit', (), {'status': False, })
 
         def callback(ch, method, properties, body):
-            message_dict.add_message(method.delivery_tag, body, ch)
+            message_dict.add_message(body)
+            print(body)
             if commit.status:
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+                message_dict.save_to_db()
                 commit.status = False
 
         channel.basic_qos(prefetch_count=0)

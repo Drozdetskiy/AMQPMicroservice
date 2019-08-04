@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rating_consumer_service',
+    'rating_api',
 ]
 
 MIDDLEWARE = [
