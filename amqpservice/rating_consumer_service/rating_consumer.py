@@ -41,7 +41,7 @@ class MessageDict:
             self._query = UserRating.objects.filter(
                 user_id__in=self.message_dict.keys()
             )
-            print(self._query)
+            print('saved')
         for rated_user in self._query:
             bd_date = rated_user.datetime
             updated_user_id = rated_user.user_id
@@ -59,8 +59,6 @@ class MessageDict:
         May be called only after _create_update_list.
         """
         self._new_objects_list = self.message_dict.values()
-        print(self._new_objects_list)
-        print(self._update_list)
 
     def _clear_data(self):
         self.message_dict.clear()
@@ -103,7 +101,6 @@ def run_consumer():
 
         def callback(ch, method, properties, body):
             message_dict.add_message(body)
-            print(body)
             if commit.status:
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
                 message_dict.save_to_db()
