@@ -55,12 +55,14 @@ services:
       - rabbitmq
 
   redis:
+    container_name: redis
     image: redis
-    restart: unless-stopped
-    expose:
-      - "6379"
+    ports:
+      - "6380:6380"
     volumes:
       - .:/data
+    entrypoint: redis-server --appendonly yes
+    restart: always
 
   rabbitmq:
     image: "rabbitmq:3-management"
