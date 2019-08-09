@@ -4,13 +4,8 @@ import django
 
 from celery import Celery
 
-from rating_api.tasks import SCHEDULE as RATING_API_SHEDULE
-
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'amqpservice.settings')
-django.setup()
 
 app = Celery('amqpservice')
 app.config_from_object('django.conf:settings', namespace='CELERY')
-
-app.conf.beat_schedule = RATING_API_SHEDULE
 app.autodiscover_tasks()
