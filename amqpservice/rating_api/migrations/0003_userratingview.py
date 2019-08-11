@@ -11,15 +11,10 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            """
-            CREATE MATERIALIZED VIEW rating_api_userratingview AS
-            SELECT id, user_id, rating, datetime
-            FROM rating_api_userrating
-            ORDER BY rating DESC, datetime ASC;
-            """,
-            """
-            DROP MATERIALIZED VIEW rating_api_userratingview;
-            """
+            'CREATE MATERIALIZED VIEW rating_api_userratingview AS SELECT id, '
+            'ROW_NUMBER() OVER(ORDER BY rating DESC, datetime ASC) AS Row, '
+            'user_id, rating, datetime FROM rating_api_userrating;',
+            'DROP MATERIALIZED VIEW rating_api_userratingview;'
         ),
     ]
 

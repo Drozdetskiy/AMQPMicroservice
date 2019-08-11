@@ -23,6 +23,7 @@ class RefreshLog(models.Model):
 
 
 class UserRatingView(models.Model):
+    row = models.IntegerField()
     user_id = models.IntegerField(unique=True)
     rating = models.FloatField()
     datetime = models.DateTimeField()
@@ -31,11 +32,21 @@ class UserRatingView(models.Model):
         managed = False
 
     def __repr__(self):
-        return f'UserRating user_id: {self.user_id} - ' \
+        return f'UserRating row: {self.row} ' \
+               f'user_id: {self.user_id} - ' \
                f'rating: {self.rating} - ' \
                f'datetime: {self.datetime}'
 
     def __str__(self):
-        return f'UserRating user_id: {self.user_id} - ' \
+        return f'UserRating row: {self.row} ' \
+               f'user_id: {self.user_id} - ' \
                f'rating: {self.rating} - ' \
                f'datetime: {self.datetime}'
+
+    @property
+    def dict_object(self):
+        return {
+            'row': self.row,
+            'user_id': self.user_id,
+            'rating': self.rating,
+        }
