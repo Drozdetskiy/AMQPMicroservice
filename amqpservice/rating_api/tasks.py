@@ -22,8 +22,10 @@ def push_to_cache(page, cache_key, connection):
                       obj.dict_object['row']
 
         user_rating_map = map(prepare_object, objects)
+        _dict = {}
         for user_rating in user_rating_map:
-            connection.zadd(cache_key, {user_rating[0]: user_rating[1]})
+            _dict[user_rating[0]] = user_rating[1]
+        connection.zadd(cache_key, _dict)
 
 
 @shared_task
@@ -72,12 +74,12 @@ SCHEDULE = {
         'task': 'rating_api.tasks.get_stored_objects',
         'args': (),
         'options': {},
-        'schedule': 30,
+        'schedule': 120,
     },
     'clear_redis_log': {
         'task': 'rating_api.tasks.clear_redis_log',
         'args': (),
         'options': {},
-        'schedule': crontab(),
+        'schedule': crontab(minute=10),
     },
 }
