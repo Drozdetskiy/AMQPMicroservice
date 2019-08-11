@@ -78,6 +78,11 @@ services:
 
   redis:
     image: "redis:alpine"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - .redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
 
   rabbitmq:
     image: "rabbitmq:3-management"
