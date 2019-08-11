@@ -1,10 +1,8 @@
 import pickle
 import time
-from datetime import timedelta
 
 import redis
 from celery import shared_task
-from celery.schedules import crontab
 from django.core.paginator import Paginator
 from django.conf import settings
 
@@ -12,26 +10,43 @@ from rating_api.models import UserRatingView
 from rating_api.utils.refresh_rating import refresh_rating
 
 
+class KeyWriter:
+    def __init__(self, connection):
+        self.connection = connection
+        self.current_key = connection.get('cache_key') \
+            if connection.exists('cache_key') else 0
+        self.previous_key = connection.get('previous_key') \
+            if connection.exists('previous_key') else 0
+
+    def write_new_key(self, new_key):
+        previous_key_buffer = self.previous_key
+        self.current_key, self.previous_key = new_key, self.current_key
+        self._push_keys(previous_key_buffer)
+
+    def _push_keys(self, key_for_delete):
+        self.connection.set('cache_key', self.current_key)
+        self.connection.set('previous_key', self.previous_key)
+        if self.connection.exists(key_for_delete):
+            self.connection.delete(key_for_delete)
+
+
 def push_to_cache(page, cache_key, connection):
     objects = page.object_list
     if objects:
-        def prepare_object(obj):
-            return f'{obj.dict_object["row"]}:' \
-                   f'{obj.dict_object["user_id"]}:' \
-                   f'{obj.dict_object["rating"]}',\
-                      obj.dict_object['row']
 
-        user_rating_map = map(prepare_object, objects)
-        _dict = {}
-        for user_rating in user_rating_map:
-            _dict[user_rating[0]] = user_rating[1]
-        connection.zadd(cache_key, _dict)
+        def prepare_object(obj):
+            return pickle.dumps(obj.dict_object), obj.dict_object['row']
+
+        connection.zadd(
+            cache_key,
+            {row[0]: row[1] for row in map(prepare_object, objects)}
+        )
 
 
 @shared_task
 def get_stored_objects():
-    now = time.time()
     refresh_rating()
+
     rating_board = UserRatingView.objects.order_by('id')
     rating_paginator = Paginator(rating_board, settings.CELERY_PAGE_LEN)
     new_cache_key = time.time()
@@ -45,14 +60,8 @@ def get_stored_objects():
         page = rating_paginator.page(page_number)
         push_to_cache(page, new_cache_key, rating_board_cache)
 
-    if rating_board_cache.exists('cache_key'):
-        previous_key = rating_board_cache.get('cache_key')
-        rating_board_cache.set('cache_key', new_cache_key)
-        rating_board_cache.delete(previous_key)
-    else:
-        rating_board_cache.set('cache_key', new_cache_key)
-
-    print('#' * 20, time.time() - now)
+    key_writer = KeyWriter(rating_board_cache)
+    key_writer.write_new_key(new_cache_key)
 
 
 @shared_task
@@ -80,6 +89,6 @@ SCHEDULE = {
         'task': 'rating_api.tasks.clear_redis_log',
         'args': (),
         'options': {},
-        'schedule': crontab(minute=10),
+        'schedule': 600,
     },
 }
