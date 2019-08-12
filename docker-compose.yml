@@ -8,6 +8,8 @@ services:
     build:
       context: amqpservice
       dockerfile: Dockerfile
+    env_file:
+      - amqpservice/amqpservice.env
     command: python amqpservice/manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/amqpservice_code
